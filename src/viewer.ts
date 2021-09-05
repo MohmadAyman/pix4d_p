@@ -1,7 +1,6 @@
 import { PerspectiveCamera, Scene, WebGLRenderer } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { PointCloudOctree, Potree } from "@pnext/three-loader";
-import { CameraControls } from "./camera-controls";
 
 export class Viewer {
   /**
@@ -12,6 +11,7 @@ export class Viewer {
    * The ThreeJS renderer used to render the scene.
    */
   private renderer = new WebGLRenderer();
+  // document.body.appendChild( renderer.domElement );
   /**
    * Our scene which will contain the point cloud.
    */
@@ -24,10 +24,7 @@ export class Viewer {
    * Controls which update the position of the camera.
    */
   // private cameraControls = new CameraControls(this.camera);
-  private orbitControls = new OrbitControls(
-    this.camera,
-    this.renderer.domElement
-  );
+  private orbitControls = new OrbitControls(this.camera, this.renderer.domElement);
   /**
    * Out potree instance which handles updating point clouds, keeps track of loaded nodes, etc.
    */
@@ -59,6 +56,15 @@ export class Viewer {
     this.targetEl = targetEl;
     targetEl.appendChild(this.renderer.domElement);
 
+    this.orbitControls.enableDamping = true; // an animation loop is required when either damping or auto-rotation are enabled
+    this.orbitControls.dampingFactor = 0.05;
+
+    this.orbitControls.screenSpacePanning = false;
+
+    this.orbitControls.minDistance = 10;
+    this.orbitControls.maxDistance = 50;
+
+    this.orbitControls.maxPolarAngle = Math.PI / 2;
     this.resize();
     window.addEventListener("resize", this.resize);
 
@@ -117,7 +123,7 @@ export class Viewer {
     // Alternatively, you could use Three's OrbitControls or any other
     // camera control system.
     // this.cameraControls.update(dt);
-    // this.OrbitControls.update(dt);
+    // this.orbitControls.update();
     // This is where most of the potree magic happens. It updates the
     // visiblily of the octree nodes based on the camera frustum and it
     // triggers any loads/unloads which are necessary to keep the number
@@ -144,6 +150,8 @@ export class Viewer {
     if (prevTime === undefined) {
       return;
     }
+
+    this.orbitControls.update();
 
     this.update(time - prevTime);
     this.render();
