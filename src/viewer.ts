@@ -1,6 +1,6 @@
 import { PerspectiveCamera, Scene, WebGLRenderer } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
-import { PointCloudOctree, Potree } from "@pnext/three-loader";
+import { PointCloudOctree, Potree, PointShape, PointColorType } from "@pnext/three-loader";
 
 export class Viewer {
   /**
@@ -11,7 +11,6 @@ export class Viewer {
    * The ThreeJS renderer used to render the scene.
    */
   private renderer = new WebGLRenderer();
-  // document.body.appendChild( renderer.domElement );
   /**
    * Our scene which will contain the point cloud.
    */
@@ -44,6 +43,8 @@ export class Viewer {
 
   /**
    * Initializes the viewer into the specified element.
+   * Initializes orbitControls.
+   * Adds EventListeners.
    *
    * @param targetEl
    *    The element into which we should add the canvas where we will render the scene.
@@ -66,7 +67,20 @@ export class Viewer {
 
     this.orbitControls.maxPolarAngle = Math.PI / 2;
     this.resize();
+
     window.addEventListener("resize", this.resize);
+
+    const opacityEl = targetEl.querySelector("input[name=opacity]");
+    opacityEl.addEventListener("input", this.changePointsOpacity);
+
+    const sizeEl = targetEl.querySelector("input[name=size]");
+    sizeEl.addEventListener("input", this.changePointsSize);
+
+    const selectLayerEl = targetEl.querySelector("select[name=layers]");
+    selectLayerEl.addEventListener("change", this.changeLayer);
+
+    const selectEl = targetEl.querySelector("select");
+    selectEl.addEventListener("change", this.configPointsShape);
 
     requestAnimationFrame(this.loop);
   }
@@ -76,10 +90,15 @@ export class Viewer {
    */
   destroy(): void {
     this.targetEl.removeChild(this.renderer.domElement);
+    // Removing all child nodes event listeners, ref https://stackoverflow.com/questions/9251837/how-to-remove-all-listeners-in-an-element
+    const targetElClone = this.targetEl.cloneNode(true);
+    this.targetEl.parentNode.replaceChild(targetElClone, this.targetEl);
     this.targetEl = undefined;
+    this.orbitControls = undefined;
     window.removeEventListener("resize", this.resize);
 
     // TODO: clean point clouds or other objects added to the scene.
+    this.pointClouds = [];
 
     if (this.reqAnimationFrameHandle !== undefined) {
       cancelAnimationFrame(this.reqAnimationFrameHandle);
@@ -100,16 +119,29 @@ export class Viewer {
         // The file name of the point cloud which is to be loaded.
         fileName,
         // Given the relative URL of a file, should return a full URL.
-        (url) => `${baseUrl}${url}`
+        (url: any) => `${baseUrl}${url}`
       )
       .then((pco: PointCloudOctree) => {
-        // Add the point cloud to the scene and to our list of
-        // point clouds. We will pass this list of point clouds to
-        // potree to tell it to update them.
-        this.scene.add(pco);
-        this.pointClouds.push(pco);
 
-        return pco;
+        // Add the point clouds to the two layer of the scene.
+        // for ( let layer = 0; layer < 2; layer ++ ){
+          // Add the point cloud to the scene and to our list of
+          // point clouds. We will pass this list of point clouds to
+          // potree to tell it to update them.
+
+          // Color points based on elavation for layer 1.
+          // if (layer == 1){
+          //   pco.material.pointColorType = PointColorType.RGB_HEIGHT;
+          // }
+          // else{
+          // }
+          // pco.layers.set(layer);
+          // }
+          
+          pco.material.pointColorType = PointColorType.RGB;
+          this.scene.add(pco);
+          this.pointClouds.push(pco);
+        // }
       });
   }
 
@@ -122,8 +154,7 @@ export class Viewer {
   update(dt: number): void {
     // Alternatively, you could use Three's OrbitControls or any other
     // camera control system.
-    // this.cameraControls.update(dt);
-    // this.orbitControls.update();
+    this.orbitControls.update();
     // This is where most of the potree magic happens. It updates the
     // visiblily of the octree nodes based on the camera frustum and it
     // triggers any loads/unloads which are necessary to keep the number
@@ -159,6 +190,7 @@ export class Viewer {
 
   /**
    * Triggered anytime the window gets resized.
+   * 
    */
   resize = () => {
     const { width, height } = this.targetEl.getBoundingClientRect();
@@ -166,4 +198,81 @@ export class Viewer {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
   };
+
+  /**
+   * Triggered anytime point shape option is changed.
+   * @param e
+   *    HTML event which takes place in the DOM.
+   */
+   configPointsShape = (e: Event) => {
+     // Input value
+     let value = e.target.value;
+     switch (value) {
+       case "Square":{
+         this.pointClouds.forEach(p => p.material.shape = PointShape.SQUARE);
+         break;
+       }
+       case "Circle":{
+        this.pointClouds.forEach(p => p.material.shape = PointShape.CIRCLE);
+        break;
+      }
+      // This option is disabled by default as it raises a WebGL error.
+       case "Paraboloid":{
+        this.pointClouds.forEach(p => p.material.shape = PointShape.PARABOLOID);
+        break;
+      }
+     }
+  };
+
+  /**
+   * Triggered anytime a different layer gets selected.
+   * @param e
+   *    HTML event which takes place in the DOM.
+   * 
+   */
+     changeLayer = (e: Event) => {
+      let value = e.target.value;
+      switch (value) {
+        case "1":{
+          // this.camera.layers.enable(0);
+          // this.camera.layers.disable(1);
+          this.pointClouds.forEach(p => p.material.pointColorType = PointColorType.RGB);
+          break;
+        }
+        case "2":{
+          // this.camera.layers.enable(1);
+          // this.camera.layers.disable(0);
+          this.pointClouds.forEach(p => p.material.pointColorType = PointColorType.RGB_HEIGHT);
+          break;
+       }
+      }
+   };
+
+  /**
+   * Triggered anytime the points opacity property gets modified.
+   * @param e
+   *    HTML event which takes place in the DOM.
+   * 
+   */
+      changePointsOpacity = (e: Event) => {
+        // Input value
+        let value = e.target.value;
+        if (!isNaN(Number(value)) && value != ""){
+          this.pointClouds.forEach(p => p.material.opacity = value);
+        }
+      };
+
+  /**
+   * Triggered anytime the points size property get modified.
+   * @param e
+   *    HTML event which takes place in the DOM.
+   * 
+   */
+    changePointsSize = (e: Event) => {
+      // Input value
+      let value = e.target.value;
+      if (! isNaN(Number(value)) && value != ""){
+        this.pointClouds.forEach(p => p.material.size = value);
+      }
+};
 }

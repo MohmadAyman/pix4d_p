@@ -2,7 +2,6 @@
   "name": "pix4d-three-potree-loader-example",
   "version": "1.0.0",
   "description": "Simple example for loading a point cloud with three-potree-loader.",
-  "main": "index.html",
   "scripts": {
     "start": "parcel index.html --open",
     "build": "parcel build index.html"
